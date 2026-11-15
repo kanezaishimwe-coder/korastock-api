@@ -1,0 +1,9 @@
+ALTER TABLE users
+    MODIFY COLUMN name VARCHAR(255) NULL,
+    MODIFY COLUMN username VARCHAR(191) NOT NULL,
+    MODIFY COLUMN email VARCHAR(255) NULL,
+    MODIFY COLUMN password VARCHAR(255) NOT NULL,
+    ADD COLUMN role ENUM('admin', 'user', 'manager') NOT NULL DEFAULT 'user',
+    ADD COLUMN department VARCHAR(100) NOT NULL DEFAULT 'General',
+    ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD UNIQUE KEY uq_users_username (username);
