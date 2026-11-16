@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const mysql = require("mysql2/promise");
 
+// Keeps database connections ready for application queries.
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -12,12 +13,19 @@ const pool = mysql.createPool({
     queueLimit: 0,
 });
 
+// Checks settings and releases connections after each check.
 async function verifyDatabaseConnection() {
     const requiredVariables = ["DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME"];
-    const missingVariables = requiredVariables.filter(
-        (name) => process.env[name] === undefined ||
-            (name !== "DB_PASSWORD" && process.env[name].trim() === "")
-    );
+    const missingVariables = [];
+    for (const name of requiredVariables) {
+        const value = process.env[name];
+        if (value === undefined) {
+            missingVariables.push(name);
+        } else if (name !== "DB_PASSWORD" && value.trim() === "") {
+            missingVariables.push(name);
+        }
+    }
+
     if (missingVariables.length > 0) {
         throw new Error(`Missing database configuration: ${missingVariables.join(", ")}`);
     }

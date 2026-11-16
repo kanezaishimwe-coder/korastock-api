@@ -11,10 +11,14 @@ app.use(routes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
 
-app.get("/", (req, res) => {
-    res.send("Welcome to my application");
-});
+app.get("/", showWelcomeMessage);
 
+// Sends the welcome message on the home page.
+function showWelcomeMessage(req, res) {
+    res.send("Welcome to my application");
+}
+
+// Checks the database before starting the web server.
 async function startServer() {
     await verifyDatabaseConnection();
     return app.listen(port, () => {

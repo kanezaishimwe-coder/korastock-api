@@ -19,6 +19,7 @@ function priceToCents(price) {
     return Number.isSafeInteger(cents) ? cents : null;
 }
 
+// Shows orders allowed for the signed-in user's role.
 async function getOrders(req, res) {
     const isPrivileged = req.user.role === "admin" || req.user.role === "manager";
     if (!isPrivileged && req.user.role !== "user") {
@@ -47,7 +48,15 @@ async function getOrders(req, res) {
 async function getOrder(req, res) {
     const orderId = readOrderId(req, res);
     if (orderId === null) return;
-    if (!["admin", "manager", "user"].includes(req.user.role)) {
+    let roleCanReadOrder = false;
+    const allowedRoles = ["admin", "manager", "user"];
+    for (const role of allowedRoles) {
+        if (role === req.user.role) {
+            roleCanReadOrder = true;
+            break;
+        }
+    }
+    if (!roleCanReadOrder) {
         res.status(403).json({ message: "Your role is not allowed to access this resource" });
         return;
     }
@@ -69,6 +78,18 @@ async function getOrder(req, res) {
             return;
         }
 
+        const items = [];
+        for (const row of rows) {
+            if (row.product_id !== null) {
+                items.push({
+                    product_id: row.product_id,
+                    product_name: row.product_name,
+                    quantity: row.quantity,
+                    price_at_purchase: row.price_at_purchase,
+                });
+            }
+        }
+
         const order = {
             id: rows[0].id,
             user_id: rows[0].user_id,
@@ -77,14 +98,7 @@ async function getOrder(req, res) {
             total_amount: rows[0].total_amount,
             status: rows[0].status,
             created_at: rows[0].created_at,
-            items: rows
-                .filter((row) => row.product_id !== null)
-                .map((row) => ({
-                    product_id: row.product_id,
-                    product_name: row.product_name,
-                    quantity: row.quantity,
-                    price_at_purchase: row.price_at_purchase,
-                })),
+            items,
         };
         res.status(200).json(order);
     } catch (error) {
@@ -93,6 +107,7 @@ async function getOrder(req, res) {
     }
 }
 
+// Restores item stock inside the cancellation transaction.
 async function cancelOrder(req, res) {
     const orderId = readOrderId(req, res);
     if (orderId === null) return;
@@ -173,20 +188,29 @@ async function getSalesSummary(req, res) {
     }
 }
 
+// Checks stock and saves order items in one transaction.
 async function createOrder(req, res) {
-    const { items } = req.body ?? {};
-    if (
-        !Array.isArray(items) ||
-        items.length === 0 ||
-        items.some(
-            (item) =>
+    let body = req.body;
+    if (body === null || body === undefined) {
+        body = {};
+    }
+    const items = body.items;
+    let itemsAreValid = Array.isArray(items) && items.length > 0;
+    if (itemsAreValid) {
+        for (const item of items) {
+            if (
                 !item ||
                 !Number.isSafeInteger(item.product_id) ||
                 item.product_id < 1 ||
                 !Number.isSafeInteger(item.quantity) ||
                 item.quantity < 1
-        )
-    ) {
+            ) {
+                itemsAreValid = false;
+                break;
+            }
+        }
+    }
+    if (!itemsAreValid) {
         res.status(400).json({
             message: "items must be a non-empty array of objects with positive integer product_id and quantity values",
         });

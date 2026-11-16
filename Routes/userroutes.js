@@ -16,10 +16,14 @@ const {
     authorizeAccess,
 } = require("../middleware/authMiddleware.js");
 
-const adminAllowedIPs = (process.env.ADMIN_ALLOWED_IPS || "")
-    .split(",")
-    .map((ip) => ip.trim())
-    .filter(Boolean);
+const adminAllowedIPs = [];
+const configuredAdminIPs = (process.env.ADMIN_ALLOWED_IPS || "").split(",");
+for (const ip of configuredAdminIPs) {
+    const trimmedIP = ip.trim();
+    if (trimmedIP) {
+        adminAllowedIPs.push(trimmedIP);
+    }
+}
 
 router.post("/register", authorizeRegistrationRole, AddUser);
 router.post("/user", authorizeRegistrationRole, AddUser);

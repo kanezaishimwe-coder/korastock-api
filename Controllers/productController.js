@@ -18,6 +18,7 @@ function isNonNegativeInteger(value) {
     return Number.isSafeInteger(value) && value >= 0;
 }
 
+// Lists products using the requested category and stock filters.
 async function getAllProducts(req, res) {
     const { category, lowStock } = req.query;
     if (category !== undefined && typeof category !== "string") {
@@ -79,6 +80,10 @@ async function getProduct(req, res) {
 }
 
 async function createProduct(req, res) {
+    let body = req.body;
+    if (body === null || body === undefined) {
+        body = {};
+    }
     const {
         name,
         sku,
@@ -86,7 +91,7 @@ async function createProduct(req, res) {
         unit_price: unitPrice,
         stock_quantity: stockQuantity,
         low_stock_limit: lowStockLimit,
-    } = req.body ?? {};
+    } = body;
 
     if (
         typeof name !== "string" ||
@@ -140,20 +145,29 @@ async function updateProductStock(req, res) {
     const productId = readProductId(req, res);
     if (productId === null) return;
 
-    const body = req.body ?? {};
+    let body = req.body;
+    if (body === null || body === undefined) {
+        body = {};
+    }
     const allowedFields = ["stock_quantity", "unit_price", "low_stock_limit"];
-    const fields = allowedFields.filter((field) =>
-        Object.prototype.hasOwnProperty.call(body, field)
-    );
-    if (
-        !Object.prototype.hasOwnProperty.call(body, "stock_quantity") ||
-        fields.some((field) => {
+    const fields = [];
+    let fieldsAreValid = true;
+    for (const field of allowedFields) {
+        if (Object.prototype.hasOwnProperty.call(body, field)) {
+            fields.push(field);
             const value = body[field];
             if (field === "unit_price") {
-                return typeof value !== "number" || !Number.isFinite(value) || value <= 0;
+                if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+                    fieldsAreValid = false;
+                }
+            } else if (!isNonNegativeInteger(value)) {
+                fieldsAreValid = false;
             }
-            return !isNonNegativeInteger(value);
-        })
+        }
+    }
+    if (
+        !Object.prototype.hasOwnProperty.call(body, "stock_quantity") ||
+        !fieldsAreValid
     ) {
         res.status(400).json({
             message: "A non-negative integer stock_quantity is required; low_stock_limit must be a non-negative integer and unit_price must be positive when provided",
@@ -161,8 +175,12 @@ async function updateProductStock(req, res) {
         return;
     }
 
-    const assignments = fields.map((field) => `${field} = ?`).join(", ");
-    const values = fields.map((field) => body[field]);
+    const assignments = [];
+    const values = [];
+    for (const field of fields) {
+        assignments.push(`${field} = ?`);
+        values.push(body[field]);
+    }
     values.push(productId);
 
     try {
@@ -187,6 +205,7 @@ async function updateProductStock(req, res) {
     }
 }
 
+// Deletes products only after checking their order links.
 async function deleteProduct(req, res) {
     const productId = readProductId(req, res);
     if (productId === null) return;

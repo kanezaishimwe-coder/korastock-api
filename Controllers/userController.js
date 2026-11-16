@@ -19,25 +19,43 @@ function readUserId(req, res) {
 }
 
 function readUserFields(req, res) {
-    const { name, username, email, password } = req.body ?? {};
-    if ([name, username, email, password].some(
-        (value) => typeof value !== "string" || value.trim() === ""
-    )) {
-        res.status(400).json({
-            message: "name, username, email, and password are required strings",
-        });
-        return null;
+    let body = req.body;
+    if (body === null || body === undefined) {
+        body = {};
+    }
+    const { name, username, email, password } = body;
+    const requiredFields = [name, username, email, password];
+    for (const value of requiredFields) {
+        if (typeof value !== "string" || value.trim() === "") {
+            res.status(400).json({
+                message: "name, username, email, and password are required strings",
+            });
+            return null;
+        }
     }
     return [name.trim(), username.trim(), email.trim(), password];
 }
+
+// Creates a user after checking the submitted account details.
 async function AddUser(req, res) {
-    const { username, password, role, department } = req.body ?? {};
+    let body = req.body;
+    if (body === null || body === undefined) {
+        body = {};
+    }
+    const { username, password, role, department } = body;
+    let roleIsAllowed = false;
+    for (const allowedRole of allowedRoles) {
+        if (role === allowedRole) {
+            roleIsAllowed = true;
+            break;
+        }
+    }
     if (
         typeof username !== "string" ||
         username.trim() === "" ||
         typeof password !== "string" ||
         password.trim() === "" ||
-        !allowedRoles.includes(role) ||
+        !roleIsAllowed ||
         typeof department !== "string" ||
         department.trim() === ""
     ) {
@@ -67,8 +85,13 @@ async function AddUser(req, res) {
     }
 }
 
+// Checks login details before creating an access token.
 async function login(req, res) {
-    const { username, password } = req.body ?? {};
+    let body = req.body;
+    if (body === null || body === undefined) {
+        body = {};
+    }
+    const { username, password } = body;
     if (
         typeof username !== "string" ||
         username.trim() === "" ||
